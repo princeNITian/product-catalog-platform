@@ -115,14 +115,26 @@ resource "aws_lambda_function" "create_product" {
   environment {
     variables = {
       PRODUCTS_TABLE = aws_dynamodb_table.products.name
+      VALKEY_HOST    = aws_elasticache_serverless_cache.valkey.endpoint[0].address
+      VALKEY_PORT    = tostring(aws_elasticache_serverless_cache.valkey.endpoint[0].port)
+      VALKEY_TLS     = "true"
     }
   }
 
   depends_on = [
     aws_iam_role_policy_attachment.lambda_logs,
     aws_iam_role_policy.dynamodb_access,
-    aws_cloudwatch_log_group.create_product
+    aws_cloudwatch_log_group.create_product,
+    aws_iam_role_policy_attachment.lambda_vpc_access
   ]
+
+  vpc_config {
+    subnet_ids = aws_subnet.private[*].id
+
+    security_group_ids = [
+      aws_security_group.lambda.id
+    ]
+  }
 }
 
 # ------------------------------------------------
@@ -145,14 +157,26 @@ resource "aws_lambda_function" "get_product" {
   environment {
     variables = {
       PRODUCTS_TABLE = aws_dynamodb_table.products.name
+      VALKEY_HOST    = aws_elasticache_serverless_cache.valkey.endpoint[0].address
+      VALKEY_PORT    = tostring(aws_elasticache_serverless_cache.valkey.endpoint[0].port)
+      VALKEY_TLS     = "true"
     }
   }
 
   depends_on = [
     aws_iam_role_policy_attachment.lambda_logs,
     aws_iam_role_policy.dynamodb_access,
-    aws_cloudwatch_log_group.get_product
+    aws_cloudwatch_log_group.get_product,
+    aws_iam_role_policy_attachment.lambda_vpc_access
   ]
+
+  vpc_config {
+    subnet_ids = aws_subnet.private[*].id
+
+    security_group_ids = [
+      aws_security_group.lambda.id
+    ]
+  }
 }
 
 # ------------------------------------------------
@@ -236,4 +260,10 @@ resource "aws_lambda_permission" "get_product" {
   principal     = "apigateway.amazonaws.com"
 
   source_arn = "${aws_apigatewayv2_api.api.execution_arn}/*/*"
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_vpc_access" {
+  role = aws_iam_role.lambda_role.name
+
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
 }
